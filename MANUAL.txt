@@ -1,0 +1,7 @@
+1.- Compilar proyecto: mvn clean package -DskipTests
+2.- Desplegar funciones en Azure: mvn azure-functions:deploy
+
+
+[INFO] HTTP Trigger Urls:
+         AsignarRol : https://crearusuario.azurewebsites.net/api/asignarrol
+         CrearUsuario : https://crearusuario.azurewebsites.net/api/crearusuario
