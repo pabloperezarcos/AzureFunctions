@@ -15,20 +15,43 @@ public class AsignarRolFunction {
 
     @FunctionName("AsignarRol")
     public HttpResponseMessage run(
-            @HttpTrigger(name = "req", methods = { HttpMethod.GET,
-                    HttpMethod.POST }, authLevel = AuthorizationLevel.ANONYMOUS) HttpRequestMessage<Optional<String>> request,
+            @HttpTrigger(name = "req", methods = { HttpMethod.POST },
+                    authLevel = AuthorizationLevel.ANONYMOUS) HttpRequestMessage<Optional<String>> request,
             final ExecutionContext context) {
-        context.getLogger().info("Java HTTP trigger processed a request.");
 
-        // Parse query parameter
-        final String query = request.getQueryParameters().get("name");
-        final String name = request.getBody().orElse(query);
+        context.getLogger().info("Procesando solicitud para asignar rol.");
 
-        if (name == null) {
-            return request.createResponseBuilder(HttpStatus.BAD_REQUEST)
-                    .body("Please pass a name on the query string or in the request body").build();
-        } else {
-            return request.createResponseBuilder(HttpStatus.OK).body("Hello, " + name).build();
+        String userId = request.getQueryParameters().get("userId");
+        String rolId = request.getQueryParameters().get("rolId");
+
+        Optional<String> bodyOptional = request.getBody();
+        if ((userId == null || rolId == null) && bodyOptional.isPresent()) {
+            String body = bodyOptional.get().trim();
+
+            String[] parts = body.split(",");
+            if (parts.length >= 2) {
+                if (userId == null || userId.isEmpty()) {
+                    userId = parts[0].trim();
+                }
+                if (rolId == null || rolId.isEmpty()) {
+                    rolId = parts[1].trim();
+                }
+            }
         }
+
+        if (userId == null || rolId == null || userId.isEmpty() || rolId.isEmpty()) {
+            return request.createResponseBuilder(HttpStatus.BAD_REQUEST)
+                    .body("{\"error\":\"Por favor, proporciona 'userId' y 'rolId' en la consulta o en el cuerpo.\"}")
+                    .header("Content-Type", "application/json")
+                    .build();
+        }
+
+        String responseMessage = "{\"mensaje\":\"Rol asignado exitosamente\", \"userId\":\"" + userId
+                + "\", \"rolId\":\"" + rolId + "\"}";
+
+        return request.createResponseBuilder(HttpStatus.OK)
+                .body(responseMessage)
+                .header("Content-Type", "application/json")
+                .build();
     }
 }
