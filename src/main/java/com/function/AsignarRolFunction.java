@@ -15,8 +15,17 @@ import java.sql.PreparedStatement;
 import java.sql.SQLException;
 import java.util.Optional;
 
+/**
+ * Función serverless en Azure encargada de asignar un rol existente a un
+ * usuario.
+ * Para ello, inserta un nuevo registro en la tabla intermedia "usuario_roles".
+ */
 public class AsignarRolFunction {
 
+    /**
+     * Nombre de la función en Azure: "AsignarRol".
+     * Se invoca con un método POST.
+     */
     @FunctionName("AsignarRol")
     public HttpResponseMessage run(
             @HttpTrigger(name = "req", methods = {
@@ -29,11 +38,12 @@ public class AsignarRolFunction {
         String userId = request.getQueryParameters().get("userId");
         String rolId = request.getQueryParameters().get("rolId");
 
-        // Intentar obtener los valores desde el cuerpo si no están en la query
+        // Si no vienen en la query, intentar obtenerlos del cuerpo
+        // (texto:"userId,rolId")
         Optional<String> bodyOptional = request.getBody();
         if ((userId == null || rolId == null) && bodyOptional.isPresent()) {
             String body = bodyOptional.get().trim();
-            // Se asume formato: "userId,rolId"
+            // Se asume un formato simple: "userId,rolId" (por ejemplo, "2,1")
             String[] parts = body.split(",");
             if (parts.length >= 2) {
                 if (userId == null || userId.isEmpty()) {
@@ -45,6 +55,7 @@ public class AsignarRolFunction {
             }
         }
 
+        // Validar la existencia de userId y rolId
         if (userId == null || rolId == null || userId.isEmpty() || rolId.isEmpty()) {
             return request.createResponseBuilder(HttpStatus.BAD_REQUEST)
                     .body("{\"error\":\"Por favor, proporciona 'userId' y 'rolId' en la consulta o en el cuerpo.\"}")
@@ -52,19 +63,21 @@ public class AsignarRolFunction {
                     .build();
         }
 
-        // Conexión a la base de datos usando JDBC
+        // Obtener variables de entorno para la conexión a la base de datos
         String dbUrl = System.getenv("DB_URL");
         String dbUser = System.getenv("DB_USER");
         String dbPassword = System.getenv("DB_PASSWORD");
 
         String responseMessage;
         try (Connection connection = DriverManager.getConnection(dbUrl, dbUser, dbPassword)) {
+            // Insertar en la tabla 'usuario_roles'
             String sql = "INSERT INTO usuario_roles (usuario_id, rol_id) VALUES (?, ?)";
             try (PreparedStatement ps = connection.prepareStatement(sql)) {
                 ps.setInt(1, Integer.parseInt(userId));
                 ps.setInt(2, Integer.parseInt(rolId));
                 int rowsAffected = ps.executeUpdate();
                 if (rowsAffected > 0) {
+                    // Construye mensaje de éxito en formato JSON
                     responseMessage = "{\"mensaje\":\"Rol asignado exitosamente\", \"userId\":\"" + userId
                             + "\", \"rolId\":\"" + rolId + "\"}";
                 } else {
@@ -79,6 +92,7 @@ public class AsignarRolFunction {
                     .header("Content-Type", "application/json")
                     .build();
         } catch (NumberFormatException nfe) {
+            // Maneja el caso en que userId o rolId no sean valores numéricos
             responseMessage = "{\"error\":\"Los parámetros 'userId' y 'rolId' deben ser numéricos.\"}";
             return request.createResponseBuilder(HttpStatus.BAD_REQUEST)
                     .body(responseMessage)
@@ -86,6 +100,7 @@ public class AsignarRolFunction {
                     .build();
         }
 
+        // Retorna una respuesta exitosa en formato JSON
         return request.createResponseBuilder(HttpStatus.OK)
                 .body(responseMessage)
                 .header("Content-Type", "application/json")
